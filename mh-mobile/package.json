@@ -5,6 +5,9 @@
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/ui": "~58.0.22",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-navigation/bottom-tabs": "^7.21.0",
+    "@react-navigation/native": "^7.5.1",
     "expo": "^58.0.17",
     "expo-constants": "~58.0.13",
     "expo-device": "~58.0.5",
