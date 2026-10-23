@@ -1,9 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Tabs } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { borderWidth, colors, fontFamily, fontSize, shadows, spacing } from '../constants/theme';
+
+/** Tipo das props vem do próprio <Tabs> do Expo Router, para sempre bater com a versão instalada. */
+type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -15,21 +17,19 @@ type TabConfig = {
 };
 
 const TAB_CONFIG: Record<string, TabConfig> = {
-  Home: { label: 'Home', icon: 'home-outline', iconActive: 'home' },
-  Anuncios: { label: 'Anúncios', icon: 'volume-high', iconActive: 'volume-high' },
-  SimularFrete: {
+  index: { label: 'Home', icon: 'home-outline', iconActive: 'home' },
+  anuncios: { label: 'Anúncios', icon: 'volume-high', iconActive: 'volume-high' },
+  'simular-frete': {
     label: 'Simular frete',
     icon: 'truck-outline',
     iconActive: 'truck',
     highlight: true,
   },
-  Insights: { label: 'Insights', icon: 'lightbulb-on-outline', iconActive: 'lightbulb-on' },
-  Configuracoes: { label: 'Configurações', icon: 'cog-outline', iconActive: 'cog' },
+  insights: { label: 'Insights', icon: 'lightbulb-on-outline', iconActive: 'lightbulb-on' },
+  configuracoes: { label: 'Configurações', icon: 'cog-outline', iconActive: 'cog' },
 };
 
-export function BottomTabBar({ state, navigation }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
-
+export function BottomTabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {state.routes.map((route, index) => {
@@ -39,18 +39,18 @@ export function BottomTabBar({ state, navigation }: BottomTabBarProps) {
         const isFocused = state.index === index;
 
         const onPress = () => {
-          const event = navigation.emit({
+          const event = emitter.emit({
             type: 'tabPress',
             target: route.key,
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+            navigateToTab(route.key);
           }
         };
 
         const onLongPress = () => {
-          navigation.emit({ type: 'tabLongPress', target: route.key });
+          emitter.emit({ type: 'tabLongPress', target: route.key });
         };
 
         const common = {
