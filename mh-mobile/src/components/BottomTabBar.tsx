@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { borderWidth, colors, fontFamily, fontSize, shadows, spacing } from '../constants/theme';
+import { borderWidth, fontFamily, fontSize, spacing, Theme } from '../constants/theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 /** Tipo das props vem do próprio <Tabs> do Expo Router, para sempre bater com a versão instalada. */
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -30,6 +31,9 @@ const TAB_CONFIG: Record<string, TabConfig> = {
 };
 
 export function BottomTabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {state.routes.map((route, index) => {
@@ -116,40 +120,41 @@ export function BottomTabBar({ state, emitter, navigateToTab, insets }: BottomTa
 
 const FAB_SIZE = 58;
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: colors.surface,
-    borderTopWidth: borderWidth.hairline,
-    borderTopColor: colors.border,
-    paddingTop: spacing.sm,
-  },
-  item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 2,
-    paddingTop: spacing.xs,
-  },
-  label: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.label,
-    lineHeight: 14,
-    color: colors.muted,
-  },
-  fab: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -(FAB_SIZE / 2 + spacing.sm), // sobe acima da barra
-    borderWidth: 4,
-    borderColor: colors.surface, // anel branco separa da barra
-    ...shadows.card,
-  },
-  fabLabel: {
-    marginTop: 2,
-  },
-});
+const createStyles = ({ colors, shadows }: Theme) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      backgroundColor: colors.surface,
+      borderTopWidth: borderWidth.hairline,
+      borderTopColor: colors.border,
+      paddingTop: spacing.sm,
+    },
+    item: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 2,
+      paddingTop: spacing.xs,
+    },
+    label: {
+      fontFamily: fontFamily.medium,
+      fontSize: fontSize.label,
+      lineHeight: 14,
+      color: colors.muted,
+    },
+    fab: {
+      width: FAB_SIZE,
+      height: FAB_SIZE,
+      borderRadius: FAB_SIZE / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: -(FAB_SIZE / 2 + spacing.sm), // sobe acima da barra
+      borderWidth: 4,
+      borderColor: colors.surface, // anel branco separa da barra
+      ...shadows.card,
+    },
+    fabLabel: {
+      marginTop: 2,
+    },
+  });

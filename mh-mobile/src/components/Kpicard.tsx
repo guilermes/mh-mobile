@@ -1,5 +1,6 @@
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { components, spacing, typography } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 type Props = {
   label: string;
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export function KpiCard({ label, value, valueColor, style }: Props) {
+  const { components, typography } = useTheme();
+
   return (
     <View style={[components.card, styles.card, style]}>
       <Text style={typography.label}>{label}</Text>

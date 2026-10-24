@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, getBadgeStyle, spacing, typography } from '../constants/theme';
+import { spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 type Props = {
   title: string;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export function ScreenHeader({ title, subtitle, connected }: Props) {
+  const { typography, getBadgeStyle } = useTheme();
   const badge = getBadgeStyle(connected ? 'success' : 'neutral');
 
   return (
@@ -35,5 +37,5 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   texts: { flex: 1 },
-  subtitle: { marginTop: spacing.xs, color: colors.muted },
+  subtitle: { marginTop: spacing.xs },
 });

@@ -5,41 +5,29 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../auth/AuthContext';
-import { colors } from '../constants/theme';
+import { AppThemeProvider, useTheme } from '../context/ThemeContext';
 
 SplashScreen.preventAutoHideAsync();
 
-/** Tema do React Navigation alinhado aos tokens do design. */
-const navigationTheme: Theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: colors.primary,
-    background: colors.bg,
-    card: colors.surface,
-    text: colors.text,
-    border: colors.border,
-    notification: colors.danger,
-  },
-};
-
 function RootNavigator() {
   const { isLoggedIn, isLoading } = useAuth();
+  const { isReady } = useTheme();
+  const ready = !isLoading && isReady;
 
-  // Esconde a splash só depois de restaurar a sessão salva
+  // Esconde a splash só depois de restaurar a sessão e a preferência de tema
   useEffect(() => {
-    if (!isLoading) SplashScreen.hideAsync();
-  }, [isLoading]);
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
 
-  if (isLoading) return null;
+  if (!ready) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -56,6 +44,31 @@ function RootNavigator() {
   );
 }
 
+/** Aplica o tema atual ao React Navigation e à barra de status. */
+function ThemedNavigation({ children }: { children: React.ReactNode }) {
+  const { colors, isDark } = useTheme();
+
+  const navigationTheme: Theme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme : DefaultTheme).colors,
+      primary: colors.primary,
+      background: colors.bg,
+      card: colors.surface,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.danger,
+    },
+  };
+
+  return (
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      {children}
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -68,12 +81,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ThemeProvider value={navigationTheme}>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </ThemeProvider>
-      </AuthProvider>
+      <AppThemeProvider>
+        <AuthProvider>
+          <ThemedNavigation>
+            <RootNavigator />
+          </ThemedNavigation>
+        </AuthProvider>
+      </AppThemeProvider>
     </SafeAreaProvider>
   );
 }

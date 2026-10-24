@@ -1,18 +1,19 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, components, fontFamily, fontSize, spacing, typography } from '../constants/theme';
+import { fontFamily, fontSize, spacing, Theme } from '../constants/theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 type Props = {
   /** Deve lançar um Error com mensagem amigável se o login falhar. */
@@ -22,6 +23,9 @@ type Props = {
 type Field = 'email' | 'password';
 
 export function LoginScreen({ onSubmit }: Props) {
+  const { colors, components, typography } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -163,48 +167,49 @@ export function LoginScreen({ onSubmit }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  brand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xxxl,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xl,
-  },
-  field: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  passwordInput: {
-    paddingRight: 44,
-  },
-  eye: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
-  error: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.small,
-    color: colors.danger,
-    marginBottom: spacing.md,
-  },
-  button: {
-    minHeight: 44,
-    marginTop: spacing.xs,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-});
+const createStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    flex: { flex: 1 },
+    container: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: spacing.xl,
+    },
+    brand: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.xxxl,
+    },
+    subtitle: {
+      marginTop: spacing.xs,
+      marginBottom: spacing.xl,
+    },
+    field: {
+      gap: spacing.xs,
+      marginBottom: spacing.lg,
+    },
+    passwordInput: {
+      paddingRight: 44,
+    },
+    eye: {
+      position: 'absolute',
+      right: 12,
+      top: 0,
+      bottom: 0,
+      justifyContent: 'center',
+    },
+    error: {
+      fontFamily: fontFamily.medium,
+      fontSize: fontSize.small,
+      color: colors.danger,
+      marginBottom: spacing.md,
+    },
+    button: {
+      minHeight: 44,
+      marginTop: spacing.xs,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+  });

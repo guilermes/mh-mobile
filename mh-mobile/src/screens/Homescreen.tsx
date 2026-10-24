@@ -3,14 +3,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KpiCard } from '../components/Kpicard';
 import { ScreenHeader } from '../components/Screenheader';
-import {
-    colors,
-    components,
-    fontFamily,
-    getFreightDeltaColor,
-    spacing,
-    typography,
-} from '../constants/theme';
+import { fontFamily, spacing, Theme } from '../constants/theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -29,6 +23,9 @@ const FREIGHT_CHANGES = [
 ];
 
 export function HomeScreen() {
+  const { colors, components, typography, getFreightDeltaColor } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <SafeAreaView style={components.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -89,37 +86,38 @@ export function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  gridItem: {
-    flexGrow: 1,
-    flexBasis: '45%',
-  },
-  sectionTitle: {
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  rowTexts: {
-    flex: 1,
-    gap: 2,
-    paddingRight: spacing.md,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 15,
-    color: colors.text,
-  },
-  delta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-});
+const createStyles = ({ colors }: Theme) =>
+  StyleSheet.create({
+    content: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+    },
+    gridItem: {
+      flexGrow: 1,
+      flexBasis: '45%',
+    },
+    sectionTitle: {
+      marginTop: spacing.xxl,
+      marginBottom: spacing.md,
+    },
+    rowTexts: {
+      flex: 1,
+      gap: 2,
+      paddingRight: spacing.md,
+    },
+    rowTitle: {
+      fontFamily: fontFamily.semibold,
+      fontSize: 15,
+      color: colors.text,
+    },
+    delta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+  });
