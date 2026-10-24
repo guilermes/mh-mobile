@@ -19,7 +19,7 @@ type TabConfig = {
 
 const TAB_CONFIG: Record<string, TabConfig> = {
   index: { label: 'Home', icon: 'home-outline', iconActive: 'home' },
-  anuncios: { label: 'Anúncios', icon: 'volume-high', iconActive: 'volume-high' },
+  anuncios: { label: 'Anúncios', icon: 'tag-outline', iconActive: 'tag' },
   'simular-frete': {
     label: 'Simular frete',
     icon: 'truck-outline',

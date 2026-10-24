@@ -21,7 +21,7 @@ function Placeholder({ title, icon }: { title: string; icon: IconName }) {
   );
 }
 
-export const AnunciosScreen = () => <Placeholder title="Anúncios" icon="volume-high" />;
+export const AnunciosScreen = () => <Placeholder title="Anúncios" icon="tag-outline" />;
 export const InsightsScreen = () => <Placeholder title="Insights" icon="lightbulb-on-outline" />;
 
 const styles = StyleSheet.create({
