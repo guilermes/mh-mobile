@@ -1,18 +1,22 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FreightEstimateCard } from '../components/FreightEstimatedCard';
 import { MeasureGauge } from '../components/MeasureGauge';
 import { ScreenHeader } from '../components/Screenheader';
 import { radius, spacing, Theme } from '../constants/theme';
 import { useTheme, useThemedStyles } from '../context/ThemeContext';
+import { estimateFreight } from '../services/freight';
 import { BoxDimensions, measureBoxFromPhoto } from '../services/measurements';
 import { readWeightFromScale } from '../services/scale';
 
 type Busy = 'measuring' | 'scale' | null;
 
 export function SimularFreteScreen() {
+  const router = useRouter();
   const { colors, components, typography } = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -20,6 +24,12 @@ export function SimularFreteScreen() {
   const [dimensions, setDimensions] = useState<BoxDimensions | null>(null);
   const [weight, setWeight] = useState<number | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+
+  // O frete só aparece quando as medidas e o peso já foram obtidos.
+  const estimate = useMemo(
+    () => (dimensions !== null && weight !== null ? estimateFreight(dimensions, weight) : null),
+    [dimensions, weight],
+  );
 
   /** Abre a câmera, registra a foto e obtém as medidas da caixa. */
   const handleTakePhoto = async () => {
@@ -72,6 +82,17 @@ export function SimularFreteScreen() {
     }
   };
 
+  /** Conclui a simulação: limpa os dados (para a próxima) e volta para a Home. */
+  const handleOk = () => {
+    setPhotoUri(null);
+    setDimensions(null);
+    setWeight(null);
+    router.navigate('/');
+  };
+
+  // Com o frete na tela, o "Ok!" vira a ação principal (única sólida).
+  const cameraIsPrimary = estimate === null;
+
   return (
     <SafeAreaView style={components.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -80,25 +101,37 @@ export function SimularFreteScreen() {
           subtitle="Use a câmera para tirar as medidas da caixa do produto. Depois de registrar as medidas, clique no botão para se conectar a balança e obter o peso do produto."
         />
 
-        {/* Ações: só a principal é sólida */}
         <View style={styles.actions}>
           <Pressable
             onPress={handleTakePhoto}
             disabled={busy !== null}
             accessibilityRole="button"
             style={({ pressed }) => [
-              components.buttonPrimary,
+              cameraIsPrimary ? components.buttonPrimary : components.buttonOutline,
               styles.button,
-              pressed && components.buttonPrimaryPressed,
+              pressed &&
+                (cameraIsPrimary
+                  ? components.buttonPrimaryPressed
+                  : components.buttonOutlinePressed),
               busy !== null && styles.disabled,
             ]}
           >
             {busy === 'measuring' ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={cameraIsPrimary ? colors.white : colors.primary} />
             ) : (
               <>
-                <MaterialCommunityIcons name="camera-outline" size={20} color={colors.white} />
-                <Text style={components.buttonPrimaryText}>Tirar foto da caixa</Text>
+                <MaterialCommunityIcons
+                  name="camera-outline"
+                  size={20}
+                  color={cameraIsPrimary ? colors.white : colors.text}
+                />
+                <Text
+                  style={
+                    cameraIsPrimary ? components.buttonPrimaryText : components.buttonOutlineText
+                  }
+                >
+                  Tirar foto da caixa
+                </Text>
               </>
             )}
           </Pressable>
@@ -169,6 +202,27 @@ export function SimularFreteScreen() {
             style={styles.gridItem}
           />
         </View>
+
+        {/* Frete: só depois que as medidas e o peso foram obtidos */}
+        {estimate ? (
+          <View style={styles.result}>
+            <FreightEstimateCard estimate={estimate} />
+
+            <Pressable
+              onPress={handleOk}
+              disabled={busy !== null}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                components.buttonPrimary,
+                styles.button,
+                pressed && components.buttonPrimaryPressed,
+                busy !== null && styles.disabled,
+              ]}
+            >
+              <Text style={components.buttonPrimaryText}>Ok!</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -217,5 +271,9 @@ const createStyles = (_t: Theme) =>
     gridItem: {
       flexGrow: 1,
       flexBasis: '45%',
+    },
+    result: {
+      marginTop: spacing.xl,
+      gap: spacing.lg,
     },
   });
