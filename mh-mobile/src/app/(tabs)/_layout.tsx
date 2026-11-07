@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { BottomTabBar } from '../../components/BottomTabBar';
+import { BottomTabBar } from '@/components/BottomTabBar';
 
 /** A ordem das telas define a posição na barra (Simular frete fica no centro). */
 export default function TabsLayout() {

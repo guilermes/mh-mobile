@@ -12,8 +12,10 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AuthProvider, useAuth } from '../auth/AuthContext';
-import { AppThemeProvider, useTheme } from '../context/ThemeContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AppThemeProvider, useTheme } from '@/context/ThemeContext';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -83,9 +85,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AppThemeProvider>
         <AuthProvider>
-          <ThemedNavigation>
-            <RootNavigator />
-          </ThemedNavigation>
+          <QueryClientProvider client={queryClient}>
+            <ThemedNavigation>
+              <RootNavigator />
+            </ThemedNavigation>
+          </QueryClientProvider>
         </AuthProvider>
       </AppThemeProvider>
     </SafeAreaProvider>

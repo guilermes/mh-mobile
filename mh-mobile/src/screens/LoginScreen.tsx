@@ -12,8 +12,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fontFamily, fontSize, spacing, Theme } from '../constants/theme';
-import { useTheme, useThemedStyles } from '../context/ThemeContext';
+import { fontFamily, fontSize, spacing, Theme } from '@/constants/theme';
+import { useTheme, useThemedStyles } from '@/context/ThemeContext';
 
 type Props = {
   /** Deve lançar um Error com mensagem amigável se o login falhar. */

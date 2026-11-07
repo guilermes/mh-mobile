@@ -1,19 +1,33 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FreightEstimateCard } from '../components/FreightEstimatedCard';
 import { MeasureGauge } from '../components/MeasureGauge';
 import { ScreenHeader } from '../components/Screenheader';
 import { radius, spacing, Theme } from '../constants/theme';
 import { useTheme, useThemedStyles } from '../context/ThemeContext';
-import { estimateFreight } from '../services/freight';
+import { api, ApiError } from '../lib/api';
+import { estimateFreight, FreightEstimate, toMedidas } from '../services/freight';
 import { BoxDimensions, measureBoxFromPhoto } from '../services/measurements';
 import { readWeightFromScale } from '../services/scale';
 
-type Busy = 'measuring' | 'scale' | null;
+type Busy = 'measuring' | 'scale' | 'saving' | null;
+
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof ApiError || e instanceof Error ? e.message : fallback;
 
 export function SimularFreteScreen() {
   const router = useRouter();
@@ -25,11 +39,44 @@ export function SimularFreteScreen() {
   const [weight, setWeight] = useState<number | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
 
-  // O frete só aparece quando as medidas e o peso já foram obtidos.
-  const estimate = useMemo(
-    () => (dimensions !== null && weight !== null ? estimateFreight(dimensions, weight) : null),
-    [dimensions, weight],
-  );
+  const [estimate, setEstimate] = useState<FreightEstimate | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const [sku, setSku] = useState('');
+
+  // O frete só é pedido à API quando as medidas e o peso já foram obtidos.
+  // Se qualquer um mudar no meio do caminho, a resposta antiga é descartada.
+  useEffect(() => {
+    if (dimensions === null || weight === null) {
+      setEstimate(null);
+      setEstimateError(null);
+      setEstimating(false);
+      return;
+    }
+
+    let cancelled = false;
+    setEstimating(true);
+    setEstimateError(null);
+
+    estimateFreight(dimensions, weight)
+      .then((res) => {
+        if (!cancelled) setEstimate(res);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setEstimate(null);
+        setEstimateError(errorMessage(e, 'Não foi possível calcular o frete.'));
+      })
+      .finally(() => {
+        if (!cancelled) setEstimating(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dimensions, weight, retryKey]);
 
   /** Abre a câmera, registra a foto e obtém as medidas da caixa. */
   const handleTakePhoto = async () => {
@@ -56,10 +103,7 @@ export function SimularFreteScreen() {
     try {
       setDimensions(await measureBoxFromPhoto(uri));
     } catch (e) {
-      Alert.alert(
-        'Não foi possível medir',
-        e instanceof Error ? e.message : 'Tente tirar outra foto da caixa.',
-      );
+      Alert.alert('Não foi possível medir', errorMessage(e, 'Tente tirar outra foto da caixa.'));
     } finally {
       setBusy(null);
     }
@@ -75,8 +119,29 @@ export function SimularFreteScreen() {
     } catch (e) {
       Alert.alert(
         'Balança indisponível',
-        e instanceof Error ? e.message : 'Não foi possível conectar à balança. Tente novamente.',
+        errorMessage(e, 'Não foi possível conectar à balança. Tente novamente.'),
       );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Opcional: grava as medidas no SKU informado (POST /api/produtos/:sku/medidas). */
+  const handleSaveToSku = async () => {
+    if (busy || dimensions === null || weight === null) return;
+    const code = sku.trim();
+    if (!code) {
+      Alert.alert('Informe o SKU', 'Digite o SKU do produto para salvar as medidas.');
+      return;
+    }
+
+    setBusy('saving');
+    try {
+      await api.setMedidas(code, toMedidas(dimensions, weight));
+      Alert.alert('Pronto', 'Medidas salvas no produto.');
+      setSku('');
+    } catch (e) {
+      Alert.alert('Não foi possível salvar', errorMessage(e, 'Tente novamente.'));
     } finally {
       setBusy(null);
     }
@@ -87,15 +152,22 @@ export function SimularFreteScreen() {
     setPhotoUri(null);
     setDimensions(null);
     setWeight(null);
+    setSku('');
     router.navigate('/');
   };
 
   // Com o frete na tela, o "Ok!" vira a ação principal (única sólida).
   const cameraIsPrimary = estimate === null;
+  const hasMeasures = dimensions !== null && weight !== null;
+  const disabled = busy !== null;
 
   return (
     <SafeAreaView style={components.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <ScreenHeader
           title="Simule o frete!"
           subtitle="Use a câmera para tirar as medidas da caixa do produto. Depois de registrar as medidas, clique no botão para se conectar a balança e obter o peso do produto."
@@ -104,7 +176,7 @@ export function SimularFreteScreen() {
         <View style={styles.actions}>
           <Pressable
             onPress={handleTakePhoto}
-            disabled={busy !== null}
+            disabled={disabled}
             accessibilityRole="button"
             style={({ pressed }) => [
               cameraIsPrimary ? components.buttonPrimary : components.buttonOutline,
@@ -113,7 +185,7 @@ export function SimularFreteScreen() {
                 (cameraIsPrimary
                   ? components.buttonPrimaryPressed
                   : components.buttonOutlinePressed),
-              busy !== null && styles.disabled,
+              disabled && styles.disabled,
             ]}
           >
             {busy === 'measuring' ? (
@@ -138,13 +210,13 @@ export function SimularFreteScreen() {
 
           <Pressable
             onPress={handleConnectScale}
-            disabled={busy !== null}
+            disabled={disabled}
             accessibilityRole="button"
             style={({ pressed }) => [
               components.buttonOutline,
               styles.button,
               pressed && components.buttonOutlinePressed,
-              busy !== null && styles.disabled,
+              disabled && styles.disabled,
             ]}
           >
             {busy === 'scale' ? (
@@ -204,23 +276,84 @@ export function SimularFreteScreen() {
         </View>
 
         {/* Frete: só depois que as medidas e o peso foram obtidos */}
-        {estimate ? (
+        {hasMeasures ? (
           <View style={styles.result}>
-            <FreightEstimateCard estimate={estimate} />
+            {estimating ? (
+              <View style={styles.estimating}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={typography.small}>Calculando o frete…</Text>
+              </View>
+            ) : null}
 
-            <Pressable
-              onPress={handleOk}
-              disabled={busy !== null}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                components.buttonPrimary,
-                styles.button,
-                pressed && components.buttonPrimaryPressed,
-                busy !== null && styles.disabled,
-              ]}
-            >
-              <Text style={components.buttonPrimaryText}>Ok!</Text>
-            </Pressable>
+            {estimateError ? (
+              <View style={styles.estimating}>
+                <Text style={[typography.small, { color: colors.danger }]}>{estimateError}</Text>
+                <Pressable
+                  onPress={() => setRetryKey((k) => k + 1)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    components.buttonOutline,
+                    styles.button,
+                    pressed && components.buttonOutlinePressed,
+                  ]}
+                >
+                  <Text style={components.buttonOutlineText}>Tentar novamente</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {estimate ? <FreightEstimateCard estimate={estimate} /> : null}
+
+            {estimate ? (
+              <View style={styles.saveBox}>
+                <Text style={typography.label}>Salvar medidas em um produto (opcional)</Text>
+                <TextInput
+                  value={sku}
+                  onChangeText={setSku}
+                  placeholder="SKU"
+                  placeholderTextColor={colors.text}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  style={[
+                    styles.skuInput,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface },
+                  ]}
+                />
+                <Pressable
+                  onPress={handleSaveToSku}
+                  disabled={disabled}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    components.buttonOutline,
+                    styles.button,
+                    pressed && components.buttonOutlinePressed,
+                    disabled && styles.disabled,
+                  ]}
+                >
+                  {busy === 'saving' ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : (
+                    <Text style={components.buttonOutlineText}>Salvar no SKU</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
+
+            {estimate ? (
+              <Pressable
+                onPress={handleOk}
+                disabled={disabled}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  components.buttonPrimary,
+                  styles.button,
+                  pressed && components.buttonPrimaryPressed,
+                  disabled && styles.disabled,
+                ]}
+              >
+                <Text style={components.buttonPrimaryText}>Ok!</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>
@@ -275,5 +408,19 @@ const createStyles = (_t: Theme) =>
     result: {
       marginTop: spacing.xl,
       gap: spacing.lg,
+    },
+    estimating: {
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    saveBox: {
+      gap: spacing.sm,
+    },
+    skuInput: {
+      borderWidth: 1,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.md,
+      minHeight: 48,
+      fontSize: 16,
     },
   });

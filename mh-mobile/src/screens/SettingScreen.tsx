@@ -1,120 +1,159 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../auth/AuthContext';
-import { ScreenHeader } from '../components/Screenheader';
-import { fontFamily, spacing, Theme } from '../constants/theme';
-import { useTheme, useThemedStyles } from '../context/ThemeContext';
+import { CepSection } from '@/components/settings/CepSection';
+import { RegrasSection } from '@/components/settings/RegrasSection';
+import { SyncSection } from '@/components/settings/SyncSection';
+import { ScreenHeader } from '@/components/Screenheader';
+import { spacing, Theme } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme, useThemedStyles } from '@/context/ThemeContext';
+import { useMe } from '@/hooks/useMe';
+import { WEB_BASE_URL } from '@/lib/api';
 
-export function SettingsScreen() {
-  const { colors, components, typography, isDark, toggleScheme } = useTheme();
-  const { signOut } = useAuth();
+export function SettingScreen() {
+  const { colors, components, typography } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const { signOut } = useAuth();
+  const { data: me, isPending, isError, error, refetch } = useMe();
 
-  const confirmSignOut = () => {
+  const connected = me?.mercadoLivre.authenticated ?? false;
+
+  /** A autorização do Mercado Livre acontece na versão web (rota /auth). */
+  const handleConnectML = async () => {
+    try {
+      await Linking.openURL(`${WEB_BASE_URL}/auth`);
+    } catch {
+      Alert.alert('Não foi possível abrir o navegador', 'Acesse a versão web para conectar sua conta.');
+    }
+  };
+
+  const handleSignOut = () => {
     Alert.alert('Sair da conta', 'Deseja realmente sair?', [
       { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Sair',
-        style: 'destructive',
-        // Ao limpar a sessão, o controle de login do _layout leva de volta ao login.
-        onPress: () => {
-          signOut();
-        },
-      },
+      { text: 'Sair', style: 'destructive', onPress: () => signOut() },
     ]);
   };
 
   return (
     <SafeAreaView style={components.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Configurações" subtitle="Preferências do aplicativo" />
+        <ScreenHeader title="Configurações" subtitle="Conta e conexões" />
 
-        {/* Aparência */}
-        <Text style={[typography.label, styles.sectionLabel]}>Aparência</Text>
-        <View style={[components.card, styles.card]}>
-          <View style={styles.row}>
-            <View style={styles.iconBox}>
-              <MaterialCommunityIcons
-                name={isDark ? 'weather-night' : 'white-balance-sunny'}
-                size={20}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.rowTexts}>
-              <Text style={styles.rowTitle}>Tema escuro</Text>
-              <Text style={typography.small}>
-                {isDark ? 'Ativado' : 'Desativado'} · toque para alternar
-              </Text>
-            </View>
-            <Switch
-              value={isDark}
-              onValueChange={toggleScheme}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.white}
-              ios_backgroundColor={colors.border}
-              accessibilityLabel="Alternar tema escuro"
-            />
+        {isPending ? (
+          <View style={styles.state}>
+            <ActivityIndicator color={colors.primary} />
           </View>
-        </View>
+        ) : isError ? (
+          <View style={styles.state}>
+            <Text style={[typography.small, { color: colors.danger }]}>
+              {error instanceof Error ? error.message : 'Não foi possível carregar a conta.'}
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                components.buttonOutline,
+                styles.button,
+                pressed && components.buttonOutlinePressed,
+              ]}
+            >
+              <Text style={components.buttonOutlineText}>Tentar novamente</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <Text style={[typography.h4, styles.sectionTitle]}>Conta</Text>
+            <View style={[components.card, styles.card]}>
+              <Text style={typography.label}>{me.user.storeName ?? 'Minha loja'}</Text>
+              <Text style={typography.small}>{me.user.email}</Text>
+              {me.user.whatsapp ? <Text style={typography.small}>{me.user.whatsapp}</Text> : null}
+            </View>
 
-        {/* Conta */}
-        <Text style={[typography.label, styles.sectionLabel]}>Conta</Text>
+            <Text style={[typography.h4, styles.sectionTitle]}>Mercado Livre</Text>
+            <View style={[components.card, styles.card]}>
+              <View style={styles.status}>
+                <MaterialCommunityIcons
+                  name={connected ? 'check-circle-outline' : 'alert-circle-outline'}
+                  size={20}
+                  color={connected ? colors.primary : colors.danger}
+                />
+                <Text style={typography.label}>{connected ? 'Conta conectada' : 'Conta não conectada'}</Text>
+              </View>
+
+              {!connected ? (
+                <>
+                  <Text style={typography.small}>
+                    A autorização é feita no navegador. Ao concluir, volte para o app e o status
+                    será atualizado.
+                  </Text>
+                  <Pressable
+                    onPress={handleConnectML}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      components.buttonPrimary,
+                      styles.button,
+                      pressed && components.buttonPrimaryPressed,
+                    ]}
+                  >
+                    <Text style={components.buttonPrimaryText}>Conectar Mercado Livre</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+
+            <SyncSection />
+            <CepSection />
+            <RegrasSection />
+          </>
+        )}
+
         <Pressable
-          onPress={confirmSignOut}
+          onPress={handleSignOut}
           accessibilityRole="button"
           style={({ pressed }) => [
             components.buttonOutline,
+            styles.button,
             styles.signOut,
             pressed && components.buttonOutlinePressed,
           ]}
         >
-          <MaterialCommunityIcons name="logout" size={20} color={colors.danger} />
-          <Text style={[components.buttonOutlineText, { color: colors.danger }]}>
-            Sair da conta
-          </Text>
+          <MaterialCommunityIcons name="logout" size={20} color={colors.text} />
+          <Text style={components.buttonOutlineText}>Sair da conta</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const createStyles = ({ colors, radius }: Theme) =>
+const createStyles = (_t: Theme) =>
   StyleSheet.create({
     content: {
       padding: spacing.lg,
       paddingBottom: spacing.xxl,
     },
-    sectionLabel: {
-      marginTop: spacing.lg,
-      marginBottom: spacing.sm,
-    },
-    card: {
-      padding: spacing.lg,
-    },
-    row: {
-      flexDirection: 'row',
+    state: {
       alignItems: 'center',
       gap: spacing.md,
+      paddingVertical: spacing.xxl,
     },
-    iconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.sm,
+    sectionTitle: {
+      marginTop: spacing.xl,
+      marginBottom: spacing.md,
+    },
+    card: {
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    status: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primarySoft,
+      gap: spacing.sm,
     },
-    rowTexts: {
-      flex: 1,
-      gap: 2,
-    },
-    rowTitle: {
-      fontFamily: fontFamily.semibold,
-      fontSize: 15,
-      color: colors.text,
+    button: {
+      minHeight: 48,
     },
     signOut: {
-      minHeight: 48,
+      marginTop: spacing.xxl,
     },
   });

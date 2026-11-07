@@ -1,5 +1,5 @@
-import { useAuth } from '../../auth/AuthContext';
-import { LoginScreen } from '../../screens/LoginScreen';
+import { useAuth } from '@/context/AuthContext';
+import { LoginScreen } from '@/screens/LoginScreen';
 
 export default function Login() {
   const { signIn } = useAuth();

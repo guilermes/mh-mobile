@@ -1,5 +1,5 @@
-import { SettingsScreen } from '../../screens/SettingScreen';
+import { SettingScreen } from '@/screens/SettingScreen';
 
 export default function ConfiguracoesRoute() {
-  return <SettingsScreen />;
+  return <SettingScreen />;
 }
