@@ -1,29 +1,40 @@
 {
   "expo": {
-    "name": "mh-mobile",
+    "name": "Marketplace Helper",
     "slug": "mh-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/marketplace-helper-ico.png",
     "scheme": "mhmobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/marketplace-helper-ico.png"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/marketplace-helper-ico.png",
+        "backgroundImage": "./assets/images/marketplace-helper-ico.png",
+        "monochromeImage": "./assets/images/marketplace-helper-ico.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.guilermes.marketplacehelper",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/marketplace-helper-ico.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permita o acesso à câmera para medir as caixas dos produtos."
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -40,6 +51,23 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "a1f3ddb2-3f4e-4c9d-b566-11ba25c4e73d"
+      }
+    },
+    "owner": "guilermes",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a1f3ddb2-3f4e-4c9d-b566-11ba25c4e73d"
     }
   }
 }

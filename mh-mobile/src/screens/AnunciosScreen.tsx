@@ -169,7 +169,7 @@ export function AnunciosScreen() {
     <SafeAreaView style={components.screen} edges={['top']}>
       <FlatList
         data={items}
-        keyExtractor={(item) => item.mlb}
+        keyExtractor={(item) => String(item.mlb)}
         renderItem={({ item }) => <AnuncioCard item={item} />}
         ListHeaderComponent={header}
         contentContainerStyle={[styles.content, isPlaceholderData && styles.dimmed]}
