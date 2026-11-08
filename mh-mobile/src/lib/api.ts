@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 const BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 /** Mesma origem da API; usada para abrir páginas web (ex.: autorização do Mercado Livre). */
-export const WEB_BASE_URL = 'https://192.168.1.53:3333';
+export const WEB_BASE_URL = BASE_URL;
 const TOKEN_KEY = 'mh_token';
 
 export const tokenStore = {
@@ -99,11 +99,11 @@ export type AnuncioItem = {
   titulo: string;
   precoDe: number;
   precoPor: number;
-  /** R$ */
-  frete: number;
+  /** R$ — pode ser nulo antes da primeira sincronização */
+  frete: number | null;
   /** R$ (custoML = frete + comissao) */
-  comissao: number;
-  _calc: { base: number; lucro: number; margem: number; custoML: number };
+  comissao: number | null;
+  _calc: { base: number; lucro: number | null; margem: number | null; custoML: number | null };
 };
 
 export type AnunciosResponse = {
@@ -126,15 +126,17 @@ export type Produto = {
   sku: string;
   nome: string;
   qtd: number;
-  custo: number;
+  /** nulo enquanto nenhum custo foi definido */
+  custo: number | null;
   largura: number | null;
   altura: number | null;
   comprimento: number | null;
   pesoReal: number | null;
-  freteCobrado: number;
-  freteReal: number;
+  /** nulos quando o produto ainda não tem medidas ou frete para comparar */
+  freteCobrado: number | null;
+  freteReal: number | null;
   /** freteReal − freteCobrado */
-  delta: number;
+  delta: number | null;
   divergente: boolean;
 };
 
@@ -175,11 +177,21 @@ export const api = {
     ) as Record<string, string | number>;
     return request<AnunciosResponse>(`/anuncios?${qs(clean)}`);
   },
-  produtos: (page = 1) => request<ProdutosResponse>(`/produtos?${qs({ page })}`),
+  produtos: (page = 1, search = '') =>
+    request<ProdutosResponse>(`/produtos?${qs(search ? { page, search } : { page })}`),
   setCusto: (sku: string, custo: number) =>
     request(`/produtos/${encodeURIComponent(sku)}/custo`, { method: 'POST', body: JSON.stringify({ custo }) }),
   setMedidas: (sku: string, m: Medidas) =>
-    request(`/produtos/${encodeURIComponent(sku)}/medidas`, { method: 'POST', body: JSON.stringify(m) }),
+    // O backend lê o peso em `pesoReal` (e não em `peso`, que é o nome usado só no /frete/estimar).
+    request(`/produtos/${encodeURIComponent(sku)}/medidas`, {
+      method: 'POST',
+      body: JSON.stringify({
+        largura: m.largura,
+        altura: m.altura,
+        comprimento: m.comprimento,
+        pesoReal: m.peso,
+      }),
+    }),
 
   estimarFrete: (m: Medidas) => request<FreteEstimado>(`/frete/estimar?${qs(m)}`),
 
