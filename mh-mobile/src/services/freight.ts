@@ -23,6 +23,8 @@ export type FreightEstimate = {
   cubicWeightKg: number;
   /** Maior valor entre o peso real e o peso cúbico, em kg. */
   billableWeightKg: number;
+  /** true quando a tarifa usou o peso cúbico (e não o peso real). */
+  usesCubicWeight?: boolean;
   /** Frete estimado em R$. */
   price: number;
 };
@@ -35,43 +37,28 @@ export const toMedidas = (d: BoxDimensions, weightKg: number): Medidas => ({
   peso: weightKg,
 });
 
-/** Primeiro campo numérico encontrado entre os nomes candidatos. */
-function pickNumber(res: FreteEstimado, keys: string[]): number | undefined {
-  for (const key of keys) {
-    const value = res[key];
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-  }
-  return undefined;
-}
-
-/**
- * Converte a resposta da API no formato que a tela e o FreightEstimateCard usam.
- * ⚠️ CONFIRA os nomes dos campos em /api/docs (Swagger) e ajuste as listas abaixo.
- */
-function fromApi(res: FreteEstimado, dimensions: BoxDimensions, weightKg: number): FreightEstimate {
-  const price = pickNumber(res, ['frete', 'valor', 'price', 'preco']);
-  if (price === undefined) {
+/** Converte a resposta de GET /api/frete/estimar no formato que a tela e o FreightEstimateCard usam. */
+function fromApi(res: FreteEstimado, dimensions: BoxDimensions): FreightEstimate {
+  if (typeof res.frete !== 'number' || !Number.isFinite(res.frete)) {
     throw new Error('A API não retornou o valor do frete. Verifique o formato da resposta.');
   }
 
-  // Volume e peso cúbico são geometria pura: calculados aqui, a menos que a API os envie.
-  const volumeCm3 =
-    pickNumber(res, ['volumeCm3', 'volume']) ?? dimensions.height * dimensions.width * dimensions.depth;
-  const cubicWeightKg =
-    pickNumber(res, ['pesoCubico', 'peso_cubico', 'cubicWeightKg']) ??
-    volumeCm3 / FREIGHT_TARIFF.cubicDivisor;
-  const billableWeightKg =
-    pickNumber(res, ['pesoTarifado', 'peso_tarifado', 'billableWeightKg']) ??
-    Math.max(weightKg, cubicWeightKg);
-
-  return { volumeCm3, cubicWeightKg, billableWeightKg, price };
+  return {
+    // A API não devolve o volume; é só altura × largura × profundidade.
+    volumeCm3: dimensions.height * dimensions.width * dimensions.depth,
+    cubicWeightKg: res.cubagem,
+    billableWeightKg: res.considerado,
+    usesCubicWeight: res.usaCubagem,
+    price: res.frete,
+  };
 }
 
 /** Estima o frete pela API (cubagem + tabela do Mercado Livre). Lança Error se a chamada falhar. */
 export async function estimateFreight(
   dimensions: BoxDimensions,
   weightKg: number,
+  salePrice: number,
 ): Promise<FreightEstimate> {
-  const res = await api.estimarFrete(toMedidas(dimensions, weightKg));
-  return fromApi(res, dimensions, weightKg);
+  const res = await api.estimarFrete(toMedidas(dimensions, weightKg), salePrice);
+  return fromApi(res, dimensions);
 }

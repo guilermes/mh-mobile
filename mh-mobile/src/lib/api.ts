@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 
-const BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+// Aceita a URL com ou sem barra final e com ou sem "/api" no fim: as rotas já somam "/api" abaixo,
+// e um "/api/api/..." cairia no middleware de token (erro "Token ausente") em vez do login.
+const BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim().replace(/\/+$/, '').replace(/\/api$/i, '');
 /** Mesma origem da API; usada para abrir páginas web (ex.: autorização do Mercado Livre). */
 export const WEB_BASE_URL = BASE_URL;
 const TOKEN_KEY = 'mh_token';
@@ -75,7 +77,17 @@ export type Medidas = {
   peso: number;
 };
 
-export type FreteEstimado = { frete?: number; valor?: number; [k: string]: unknown };
+/** Resposta de GET /api/frete/estimar. */
+export type FreteEstimado = {
+  /** Peso cúbico em kg (volume ÷ 6000) */
+  cubagem: number;
+  /** Peso usado na tarifa: o maior entre o peso real e a cubagem, em kg */
+  considerado: number;
+  /** true quando a tarifa usou a cubagem (e não o peso real) */
+  usaCubagem: boolean;
+  /** Frete estimado em R$ */
+  frete: number;
+};
 
 export type DivergenteTop = {
   mlb: string;
@@ -193,7 +205,9 @@ export const api = {
       }),
     }),
 
-  estimarFrete: (m: Medidas) => request<FreteEstimado>(`/frete/estimar?${qs(m)}`),
+  // O backend exige também o preço de venda (a tarifa do Mercado Livre depende dele).
+  estimarFrete: (m: Medidas, preco: number) =>
+    request<FreteEstimado>(`/frete/estimar?${qs({ ...m, preco })}`),
 
   regras: () => request<Regras>('/regras'),
   saveRegras: (r: Regras) => request('/regras', { method: 'PUT', body: JSON.stringify(r) }),

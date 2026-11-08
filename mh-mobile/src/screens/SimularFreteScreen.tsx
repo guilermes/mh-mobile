@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,10 +11,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FieldInput } from '@/components/settings/FieldInput';
+import { parseDecimal } from '@/utils/format';
 import { FreightEstimateCard } from '../components/FreightEstimatedCard';
 import { MeasureGauge } from '../components/MeasureGauge';
 import { ScreenHeader } from '../components/Screenheader';
@@ -22,7 +24,7 @@ import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { api, ApiError } from '../lib/api';
 import { estimateFreight, FreightEstimate, toMedidas } from '../services/freight';
 import { BoxDimensions, measureBoxFromPhoto } from '../services/measurements';
-import { readWeightFromScale } from '../services/scale';
+import { readWeightFromScale, ScaleCancelledError } from '../services/scale';
 
 type Busy = 'measuring' | 'scale' | 'saving' | null;
 
@@ -45,11 +47,22 @@ export function SimularFreteScreen() {
   const [retryKey, setRetryKey] = useState(0);
 
   const [sku, setSku] = useState('');
+  const [priceText, setPriceText] = useState('');
+  const queryClient = useQueryClient();
 
-  // O frete só é pedido à API quando as medidas e o peso já foram obtidos.
-  // Se qualquer um mudar no meio do caminho, a resposta antiga é descartada.
+  // Preço de venda válido (ou null): o frete do Mercado Livre depende dele.
+  const parsedPrice = parseDecimal(priceText);
+  const price = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : null;
+  const scaleAbort = useRef<AbortController | null>(null);
+
+  // Se a tela for fechada durante a espera, para de consultar a API.
+  useEffect(() => () => scaleAbort.current?.abort(), []);
+
+  // O frete só é pedido à API quando medidas, peso e preço de venda já foram informados.
+  // Se qualquer um mudar no meio do caminho, a resposta antiga é descartada (e a digitação do
+  // preço espera 500 ms antes de consultar).
   useEffect(() => {
-    if (dimensions === null || weight === null) {
+    if (dimensions === null || weight === null || price === null) {
       setEstimate(null);
       setEstimateError(null);
       setEstimating(false);
@@ -57,26 +70,30 @@ export function SimularFreteScreen() {
     }
 
     let cancelled = false;
+    setEstimate(null);
     setEstimating(true);
     setEstimateError(null);
 
-    estimateFreight(dimensions, weight)
-      .then((res) => {
-        if (!cancelled) setEstimate(res);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setEstimate(null);
-        setEstimateError(errorMessage(e, 'Não foi possível calcular o frete.'));
-      })
-      .finally(() => {
-        if (!cancelled) setEstimating(false);
-      });
+    const timer = setTimeout(() => {
+      estimateFreight(dimensions, weight, price)
+        .then((res) => {
+          if (!cancelled) setEstimate(res);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setEstimate(null);
+          setEstimateError(errorMessage(e, 'Não foi possível calcular o frete.'));
+        })
+        .finally(() => {
+          if (!cancelled) setEstimating(false);
+        });
+    }, 500);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [dimensions, weight, retryKey]);
+  }, [dimensions, weight, price, retryKey]);
 
   /** Abre a câmera, registra a foto e obtém as medidas da caixa. */
   const handleTakePhoto = async () => {
@@ -109,22 +126,36 @@ export function SimularFreteScreen() {
     }
   };
 
-  /** Conecta à balança e registra o peso. */
+  /** Espera a balança enviar o peso do SKU informado (ela grava o peso direto na API). */
   const handleConnectScale = async () => {
     if (busy) return;
 
+    const code = sku.trim();
+    if (!code) {
+      Alert.alert('Informe o SKU', 'Digite o SKU do produto antes de pesar: a balança grava o peso nesse SKU.');
+      return;
+    }
+
+    const controller = new AbortController();
+    scaleAbort.current = controller;
     setBusy('scale');
     try {
-      setWeight(await readWeightFromScale());
+      setWeight(await readWeightFromScale(code, { signal: controller.signal }));
+      queryClient.invalidateQueries({ queryKey: ['produtos'] }); // o peso do SKU mudou
     } catch (e) {
-      Alert.alert(
-        'Balança indisponível',
-        errorMessage(e, 'Não foi possível conectar à balança. Tente novamente.'),
-      );
+      if (!(e instanceof ScaleCancelledError)) {
+        Alert.alert(
+          'Balança indisponível',
+          errorMessage(e, 'Não foi possível obter o peso. Tente novamente.'),
+        );
+      }
     } finally {
+      scaleAbort.current = null;
       setBusy(null);
     }
   };
+
+  const handleCancelScale = () => scaleAbort.current?.abort();
 
   /** Opcional: grava as medidas no SKU informado (POST /api/produtos/:sku/medidas). */
   const handleSaveToSku = async () => {
@@ -153,6 +184,7 @@ export function SimularFreteScreen() {
     setDimensions(null);
     setWeight(null);
     setSku('');
+    setPriceText('');
     router.navigate('/');
   };
 
@@ -172,6 +204,30 @@ export function SimularFreteScreen() {
           title="Simule o frete!"
           subtitle="Use a câmera para tirar as medidas da caixa do produto. Depois de registrar as medidas, clique no botão para se conectar a balança e obter o peso do produto."
         />
+
+        <View style={styles.skuBox}>
+          <FieldInput
+            label="SKU do produto"
+            value={sku}
+            onChangeText={setSku}
+            autoCapitalize="characters"
+            placeholder="Ex.: SKA"
+            editable={busy !== 'scale'}
+          />
+          <Text style={typography.small}>
+            Digite o mesmo SKU na balança. Toque em "Conectar à balança" e só então pese o produto.
+          </Text>
+          <FieldInput
+            label="Preço de venda (R$)"
+            value={priceText}
+            onChangeText={setPriceText}
+            keyboardType="decimal-pad"
+            placeholder="Ex.: 129,90"
+          />
+          <Text style={typography.small}>
+            O frete do Mercado Livre depende do preço do anúncio.
+          </Text>
+        </View>
 
         <View style={styles.actions}>
           <Pressable
@@ -220,7 +276,10 @@ export function SimularFreteScreen() {
             ]}
           >
             {busy === 'scale' ? (
-              <ActivityIndicator color={colors.primary} />
+              <>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={components.buttonOutlineText}>Aguardando a balança…</Text>
+              </>
             ) : (
               <>
                 <MaterialCommunityIcons name="scale-balance" size={20} color={colors.text} />
@@ -228,6 +287,12 @@ export function SimularFreteScreen() {
               </>
             )}
           </Pressable>
+
+          {busy === 'scale' ? (
+            <Pressable onPress={handleCancelScale} accessibilityRole="button" hitSlop={8}>
+              <Text style={[typography.small, styles.cancel, { color: colors.danger }]}>Cancelar espera</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {photoUri ? (
@@ -278,6 +343,10 @@ export function SimularFreteScreen() {
         {/* Frete: só depois que as medidas e o peso foram obtidos */}
         {hasMeasures ? (
           <View style={styles.result}>
+            {price === null ? (
+              <Text style={typography.small}>Informe o preço de venda para calcular o frete.</Text>
+            ) : null}
+
             {estimating ? (
               <View style={styles.estimating}>
                 <ActivityIndicator color={colors.primary} />
@@ -306,19 +375,7 @@ export function SimularFreteScreen() {
 
             {estimate ? (
               <View style={styles.saveBox}>
-                <Text style={typography.label}>Salvar medidas em um produto (opcional)</Text>
-                <TextInput
-                  value={sku}
-                  onChangeText={setSku}
-                  placeholder="SKU"
-                  placeholderTextColor={colors.text}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  style={[
-                    styles.skuInput,
-                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface },
-                  ]}
-                />
+                <Text style={typography.label}>Salvar as medidas no SKU {sku.trim() || '—'} (opcional)</Text>
                 <Pressable
                   onPress={handleSaveToSku}
                   disabled={disabled}
@@ -333,7 +390,7 @@ export function SimularFreteScreen() {
                   {busy === 'saving' ? (
                     <ActivityIndicator color={colors.primary} />
                   ) : (
-                    <Text style={components.buttonOutlineText}>Salvar no SKU</Text>
+                    <Text style={components.buttonOutlineText}>Salvar medidas no SKU</Text>
                   )}
                 </Pressable>
               </View>
@@ -416,11 +473,11 @@ const createStyles = (_t: Theme) =>
     saveBox: {
       gap: spacing.sm,
     },
-    skuInput: {
-      borderWidth: 1,
-      borderRadius: radius.sm,
-      paddingHorizontal: spacing.md,
-      minHeight: 48,
-      fontSize: 16,
+    skuBox: {
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    cancel: {
+      textAlign: 'center',
     },
   });
