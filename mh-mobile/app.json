@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/marketplace-helper-ico.png",
         "backgroundImage": "./assets/images/marketplace-helper-ico.png",
         "monochromeImage": "./assets/images/marketplace-helper-ico.png"
