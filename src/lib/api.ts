@@ -41,7 +41,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let message = `Erro ${res.status}`;
     try {
       const body = await res.json();
-      message = body.error ?? body.message ?? message;
+      message = body.erro ?? body.error ?? body.message ?? message;
     } catch {
       /* resposta sem JSON */
     }
@@ -172,6 +172,106 @@ export type SyncStatus = {
 
 export type Regras = { icms: number; ipi: number; difal: number; custoOperacional: number };
 
+export type ClasseAnuncio = 'Bom' | 'Mediano' | 'Ruim';
+
+export type ClassificacaoFeatures = {
+  // Numéricas
+  preco_venda?: number | null;
+  preco_custo?: number | null;
+  margem_pct?: number | null;
+  margem_rs?: number | null;
+  comissao_pct?: number | null;
+  custo_frete?: number | null;
+  frete_sobre_preco?: number | null;
+  peso_kg?: number | null;
+  cubagem_m3?: number | null;
+  frete_gratis?: 0 | 1 | boolean | null;
+  qtd_fotos?: number | null;
+  tamanho_titulo?: number | null;
+  qtd_concorrentes?: number | null;
+  preco_relativo_mediana?: number | null;
+  preco_relativo_menor?: number | null;
+  reputacao_vendedor?: number | null;
+  mes?: number | null;
+  // Categóricas
+  categoria?: string | null;
+  tipo_anuncio?: string | null;
+  condicao?: string | null;
+};
+
+export type ClassificacaoResponse = {
+  classe: ClasseAnuncio;
+  probabilidades: Record<ClasseAnuncio, number>;
+  versao: string;
+};
+
+export type ModeloMlInfo = {
+  versao: string;
+  classes: ClasseAnuncio[];
+  treinado_em: string;
+  metricas: {
+    f1_macro: number;
+    erro_grave: number;
+    ordem: ClasseAnuncio[];
+    matriz_confusao: number[][];
+  };
+  linhas: number;
+};
+
+export function featuresFromProduto(p: Produto, extra?: Partial<ClassificacaoFeatures>): ClassificacaoFeatures {
+  const custoFrete = p.freteReal ?? p.freteCobrado ?? null;
+  const cubagemM3 =
+    p.largura !== null && p.altura !== null && p.comprimento !== null
+      ? (p.largura * p.altura * p.comprimento) / 1_000_000
+      : null;
+
+  return {
+    preco_custo: p.custo,
+    custo_frete: custoFrete,
+    peso_kg: p.pesoReal,
+    cubagem_m3: cubagemM3,
+    frete_gratis: custoFrete !== null && custoFrete > 0 ? 1 : 0,
+    tamanho_titulo: p.nome ? p.nome.trim().length : null,
+    mes: new Date().getMonth() + 1,
+    ...extra,
+  };
+}
+
+export function buildFeaturesFromAnuncio(
+  item: AnuncioItem,
+  produto?: Partial<Produto>,
+  extra?: Partial<ClassificacaoFeatures>,
+): ClassificacaoFeatures {
+  const precoVenda = item.precoPor || item.precoDe || 0;
+  const custoFrete = item.frete ?? produto?.freteReal ?? null;
+  const comissaoPct =
+    item.comissao != null && precoVenda > 0
+      ? Number(((item.comissao / precoVenda) * 100).toFixed(2))
+      : null;
+
+  const cubagemM3 =
+    produto?.largura && produto?.altura && produto?.comprimento
+      ? (produto.largura * produto.altura * produto.comprimento) / 1_000_000 // cm³ -> m³
+      : null;
+
+  return {
+    preco_venda: precoVenda,
+    preco_custo: produto?.custo ?? null,
+    margem_pct: item._calc.margem ?? null,
+    margem_rs: item._calc.lucro ?? null,
+    comissao_pct: comissaoPct,
+    custo_frete: custoFrete,
+    frete_sobre_preco:
+      custoFrete != null && precoVenda > 0 ? Number((custoFrete / precoVenda).toFixed(4)) : null,
+    peso_kg: produto?.pesoReal ?? null,
+    cubagem_m3: cubagemM3,
+    frete_gratis: custoFrete != null && custoFrete > 0 ? 1 : 0,
+    tamanho_titulo: item.titulo ? item.titulo.trim().length : null,
+    mes: new Date().getMonth() + 1,
+    ...extra,
+  };
+}
+
 const qs = (params: Record<string, string | number>) =>
   new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString();
 
@@ -217,4 +317,12 @@ export const api = {
     request('/config/cep', { method: 'PUT', body: JSON.stringify({ zipCode }) }),
   sync: () => request('/sync', { method: 'POST' }),
   syncStatus: () => request<SyncStatus>('/sync/status'),
+
+  classificarAnuncio: (features: ClassificacaoFeatures) =>
+    request<ClassificacaoResponse>('/anuncios/classificar', {
+      method: 'POST',
+      body: JSON.stringify(features),
+    }),
+
+  modeloInfo: () => request<ModeloMlInfo>('/ml/modelo'),
 };

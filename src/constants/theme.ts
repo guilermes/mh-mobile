@@ -26,6 +26,7 @@ export const lightColors = {
   danger: '#dc2626',
   white: '#ffffff',
   transparent: 'transparent',
+  warning: '#facc15',
 };
 
 export type Colors = Record<keyof typeof lightColors, string>;
@@ -44,6 +45,7 @@ export const darkColors: Colors = {
   danger: '#f87171',
   white: '#ffffff',
   transparent: 'transparent',
+  warning: '#facc15',
 };
 
 /* ------------------------------------------------------------------ */

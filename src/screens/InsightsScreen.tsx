@@ -1,3 +1,13 @@
+import { Chip } from '@/components/Chip';
+import { useClasseColor } from '@/components/Kpicard';
+import { ScreenHeader } from '@/components/Screenheader';
+import { FieldInput } from '@/components/settings/FieldInput';
+import { fontFamily, spacing, Theme } from '@/constants/theme';
+import { useTheme, useThemedStyles } from '@/context/ThemeContext';
+import { useClassificarAnuncio } from '@/hooks/useClassificarAnuncio';
+import { useProdutos, useSetCusto } from '@/hooks/useProdutos';
+import { featuresFromProduto, type Produto } from '@/lib/api';
+import { brl, parseDecimal } from '@/utils/format';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -12,14 +22,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Chip } from '@/components/Chip';
-import { FieldInput } from '@/components/settings/FieldInput';
-import { ScreenHeader } from '@/components/Screenheader';
-import { fontFamily, spacing, Theme } from '@/constants/theme';
-import { useTheme, useThemedStyles } from '@/context/ThemeContext';
-import { useProdutos, useSetCusto } from '@/hooks/useProdutos';
-import type { Produto } from '@/lib/api';
-import { brl, parseDecimal } from '@/utils/format';
 
 type Mode = 'todos' | 'divergentes';
 
@@ -36,12 +38,24 @@ function ProdutoCard({
   const [custoText, setCustoText] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const classificar = useClassificarAnuncio();
+  const mlResult = classificar.data;
+  const mlColor = useClasseColor(mlResult?.classe);
+
   const deltaColor = getFreightDeltaColor(item.delta);
   const hasMeasures =
     item.largura !== null && item.altura !== null && item.comprimento !== null && item.pesoReal !== null;
 
+  const handleClassificar = () => {
+    classificar.mutate(featuresFromProduto(item), {
+      onError: (e) => {
+        Alert.alert('Classificador', e instanceof Error ? e.message : 'Modelo indisponível.');
+      },
+    });
+  };
+
   const startEdit = () => {
-    setCustoText(String(item.custo).replace('.', ','));
+    setCustoText(item.custo !== null ? String(item.custo).replace('.', ',') : '');
     setEditing(true);
   };
 
@@ -54,6 +68,9 @@ function ProdutoCard({
     setSaving(true);
     try {
       await onSaveCusto(item.sku, value);
+      if (mlResult) {
+        classificar.mutate(featuresFromProduto({ ...item, custo: value }));
+      }
       setEditing(false);
     } catch (e) {
       Alert.alert('Não foi possível salvar', e instanceof Error ? e.message : 'Tente novamente.');
@@ -73,9 +90,18 @@ function ProdutoCard({
             {item.sku} · {item.qtd} {item.qtd === 1 ? 'anúncio' : 'anúncios'}
           </Text>
         </View>
-        {item.divergente ? (
-          <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.danger} />
-        ) : null}
+        <View style={styles.badgesRow}>
+          {mlResult ? (
+            <View style={[styles.mlBadge, { borderColor: mlColor }]}>
+              <Text style={[styles.mlBadgeText, { color: mlColor }]}>
+                {mlResult.classe} · {Math.round((mlResult.probabilidades[mlResult.classe] ?? 0) * 100)}%
+              </Text>
+            </View>
+          ) : null}
+          {item.divergente ? (
+            <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.danger} />
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.freight}>
@@ -85,11 +111,11 @@ function ProdutoCard({
             {brl(item.freteCobrado)} → {brl(item.freteReal)}
           </Text>
           <View style={styles.delta}>
-            {item.delta !== 0 && (
+            {item.delta !== null && item.delta !== 0 && (
               <MaterialCommunityIcons name={item.delta > 0 ? 'arrow-up' : 'arrow-down'} size={16} color={deltaColor} />
             )}
             <Text style={[typography.number, { color: deltaColor }]}>
-              {item.delta === 0 ? '—' : brl(Math.abs(item.delta))}
+              {item.delta === null || item.delta === 0 ? '—' : brl(Math.abs(item.delta))}
             </Text>
           </View>
         </View>
@@ -134,7 +160,11 @@ function ProdutoCard({
                 saving && { opacity: 0.7 },
               ]}
             >
-              {saving ? <ActivityIndicator color={colors.white} /> : <Text style={components.buttonPrimaryText}>Salvar</Text>}
+              {saving ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={components.buttonPrimaryText}>Salvar</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -144,18 +174,39 @@ function ProdutoCard({
             <Text style={typography.small}>Custo</Text>
             <Text style={typography.label}>{brl(item.custo)}</Text>
           </View>
-          <Pressable
-            onPress={startEdit}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              components.buttonOutline,
-              styles.button,
-              styles.editButton,
-              pressed && components.buttonOutlinePressed,
-            ]}
-          >
-            <Text style={components.buttonOutlineText}>Editar custo</Text>
-          </Pressable>
+          <View style={styles.cardActions}>
+            <Pressable
+              onPress={handleClassificar}
+              disabled={classificar.isPending}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                components.buttonOutline,
+                styles.button,
+                styles.editButton,
+                pressed && components.buttonOutlinePressed,
+              ]}
+            >
+              {classificar.isPending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={components.buttonOutlineText}>
+                  {mlResult ? 'Reavaliar IA' : 'Classificar'}
+                </Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={startEdit}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                components.buttonOutline,
+                styles.button,
+                styles.editButton,
+                pressed && components.buttonOutlinePressed,
+              ]}
+            >
+              <Text style={components.buttonOutlineText}>Editar custo</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </View>
@@ -273,11 +324,23 @@ const createStyles = ({ colors }: Theme) =>
     titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     titleTexts: { flex: 1, gap: 2 },
     cardTitle: { fontFamily: fontFamily.semibold, fontSize: 15, color: colors.text },
+    badgesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    mlBadge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    mlBadgeText: {
+      fontFamily: fontFamily.semibold,
+      fontSize: 12,
+    },
     freight: { gap: 2, marginTop: spacing.sm },
     freightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     delta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     costRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
-    editButton: { paddingHorizontal: spacing.lg, flexGrow: 0 },
+    cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    editButton: { paddingHorizontal: spacing.md, flexGrow: 0 },
     editBox: { gap: spacing.md, marginTop: spacing.sm },
     editActions: { flexDirection: 'row', gap: spacing.md },
     button: { minHeight: 44, flexGrow: 1 },
