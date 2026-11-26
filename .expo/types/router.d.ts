@@ -1,0 +1,14 @@
+/* eslint-disable */
+import * as Router from 'expo-router';
+
+export * from 'expo-router';
+
+declare module 'expo-router' {
+  export namespace ExpoRouter {
+    export interface __routes<T extends string | object = string> {
+      hrefInputParams: { pathname: Router.RelativePathString, params?: Router.UnknownInputParams } | { pathname: Router.ExternalPathString, params?: Router.UnknownInputParams } | { pathname: `/_sitemap`; params?: Router.UnknownInputParams; } | { pathname: `${'/(auth)'}/login` | `/login`; params?: Router.UnknownInputParams; } | { pathname: `${'/(tabs)'}/anuncios` | `/anuncios`; params?: Router.UnknownInputParams; } | { pathname: `${'/(tabs)'}/configuracoes` | `/configuracoes`; params?: Router.UnknownInputParams; } | { pathname: `${'/(tabs)'}` | `/`; params?: Router.UnknownInputParams; } | { pathname: `${'/(tabs)'}/insights` | `/insights`; params?: Router.UnknownInputParams; } | { pathname: `${'/(tabs)'}/simular-frete` | `/simular-frete`; params?: Router.UnknownInputParams; };
+      hrefOutputParams: { pathname: Router.RelativePathString, params?: Router.UnknownOutputParams } | { pathname: Router.ExternalPathString, params?: Router.UnknownOutputParams } | { pathname: `/_sitemap`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(auth)'}/login` | `/login`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(tabs)'}/anuncios` | `/anuncios`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(tabs)'}/configuracoes` | `/configuracoes`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(tabs)'}` | `/`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(tabs)'}/insights` | `/insights`; params?: Router.UnknownOutputParams; } | { pathname: `${'/(tabs)'}/simular-frete` | `/simular-frete`; params?: Router.UnknownOutputParams; };
+      href: Router.RelativePathString | Router.ExternalPathString | `/_sitemap${`?${string}` | `#${string}` | ''}` | `${'/(auth)'}/login${`?${string}` | `#${string}` | ''}` | `/login${`?${string}` | `#${string}` | ''}` | `${'/(tabs)'}/anuncios${`?${string}` | `#${string}` | ''}` | `/anuncios${`?${string}` | `#${string}` | ''}` | `${'/(tabs)'}/configuracoes${`?${string}` | `#${string}` | ''}` | `/configuracoes${`?${string}` | `#${string}` | ''}` | `${'/(tabs)'}${`?${string}` | `#${string}` | ''}` | `/${`?${string}` | `#${string}` | ''}` | `${'/(tabs)'}/insights${`?${string}` | `#${string}` | ''}` | `/insights${`?${string}` | `#${string}` | ''}` | `${'/(tabs)'}/simular-frete${`?${string}` | `#${string}` | ''}` | `/simular-frete${`?${string}` | `#${string}` | ''}` | { pathname: Router.RelativePathString | Router.ExternalPathString | `/_sitemap` | `${'/(auth)'}/login` | `/login` | `${'/(tabs)'}/anuncios` | `/anuncios` | `${'/(tabs)'}/configuracoes` | `/configuracoes` | `${'/(tabs)'}` | `/` | `${'/(tabs)'}/insights` | `/insights` | `${'/(tabs)'}/simular-frete` | `/simular-frete`; params?: Router.UnknownInputParams; };
+    }
+  }
+}
